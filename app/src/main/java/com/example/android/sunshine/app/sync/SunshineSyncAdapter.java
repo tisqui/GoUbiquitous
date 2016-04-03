@@ -38,7 +38,6 @@ import com.example.android.sunshine.app.data.WeatherContract;
 import com.example.android.sunshine.app.muzei.WeatherMuzeiSource;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.wearable.DataApi;
 import com.google.android.gms.wearable.PutDataMapRequest;
 import com.google.android.gms.wearable.PutDataRequest;
@@ -132,12 +131,17 @@ implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFail
 
     private void sendWeatherToWatchface(){
 
+        if(mGoogleAPIClient == null){
+            return;
+        }
+
         Context context = getContext();
         //read the weather data by the current location
         String locationQuery = Utility.getPreferredLocation(context);
         Uri weatherUri = WeatherContract.WeatherEntry.buildWeatherLocationWithDate(locationQuery, System.currentTimeMillis());
         Cursor cursor = context.getContentResolver().query(weatherUri, NOTIFY_WEATHER_PROJECTION, null, null, null);
         if (cursor.moveToFirst()) {
+            Log.d(LOG_TAG, "Sending weather to the watchface!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
             int weatherId = cursor.getInt(INDEX_WEATHER_ID);
             double high = cursor.getDouble(INDEX_MAX_TEMP);
             double low = cursor.getDouble(INDEX_MIN_TEMP);
@@ -154,18 +158,29 @@ implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFail
             putDataMapRequest.getDataMap().putDouble("low", low);
 
             PutDataRequest putDataRequest = putDataMapRequest.asPutDataRequest();
-            Wearable.DataApi.putDataItem(mGoogleAPIClient, putDataRequest).setResultCallback(
-                    new ResultCallback<DataApi.DataItemResult>() {
-                        @Override
-                        public void onResult(DataApi.DataItemResult dataItemResult) {
-                            if (!dataItemResult.getStatus().isSuccess()) {
-                                //fail
-                            } else {
-                                //success
-                            }
-                        }
-                    }
-            );
+
+            DataApi.DataItemResult result = Wearable.DataApi.putDataItem(mGoogleAPIClient, putDataRequest).await();
+            Log.d(LOG_TAG,"THREAD WEATHER DATA" );
+            if (result.getStatus().isSuccess()) {
+                Log.d(LOG_TAG, "DataMap: " + putDataMapRequest.getDataMap() + " sent successfully to data layer ");
+            } else {
+                // Log an error
+                Log.d(LOG_TAG, "ERROR: failed to send DataMap to data layer");
+            }
+
+//            Wearable.DataApi.putDataItem(mGoogleAPIClient, putDataRequest).setResultCallback(
+//                    new ResultCallback<DataApi.DataItemResult>() {
+//                        @Override
+//                        public void onResult(DataApi.DataItemResult dataItemResult) {
+//                            if (!dataItemResult.getStatus().isSuccess()) {
+//                                //fail
+//                            } else {
+//                                //success
+//                                Log.d(LOG_TAG, "Seems that success DataApi");
+//                            }
+//                        }
+//                    }
+//            );
         }
     }
 

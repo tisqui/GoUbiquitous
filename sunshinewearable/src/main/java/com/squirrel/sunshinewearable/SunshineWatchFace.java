@@ -97,7 +97,7 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
     }
 
     private class Engine extends CanvasWatchFaceService.Engine implements
-            GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
+            GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, DataApi.DataListener {
         private final String LOG_TAG = Engine.class.getSimpleName();
         final Handler mUpdateTimeHandler = new EngineHandler(this);
         boolean mRegisteredTimeZoneReceiver = false;
@@ -128,6 +128,7 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
         @Override
         public void onCreate(SurfaceHolder holder) {
             super.onCreate(holder);
+            Log.d(LOG_TAG, "OnCreate");
 
             setWatchFaceStyle(new WatchFaceStyle.Builder(SunshineWatchFace.this)
                     .setCardPeekMode(WatchFaceStyle.PEEK_MODE_VARIABLE)
@@ -151,12 +152,26 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                     .addConnectionCallbacks(this)
                     .addOnConnectionFailedListener(this)
                     .build();
+
+        }
+
+        @Override
+        public void onDataChanged(DataEventBuffer dataEventBuffer) {
+            Log.d(LOG_TAG, "FINALLY RECEIVED SMTH");
+            for (DataEvent event : dataEventBuffer) {
+                if (event.getType() == DataEvent.TYPE_CHANGED) {
+                    DataItem item = event.getDataItem();
+                    getWeatherData(item);
+                }
+            }
+            dataEventBuffer.release();
         }
 
         //onDataChangedListener will get notified every time there is a change in the data layer
         private final DataApi.DataListener onDataChangedListener = new DataApi.DataListener() {
             @Override
             public void onDataChanged(DataEventBuffer dataEvents) {
+                Log.d(LOG_TAG, "Callback onDataChangedListener pulled");
                 for (DataEvent event : dataEvents) {
                     if (event.getType() == DataEvent.TYPE_CHANGED) {
                         DataItem item = event.getDataItem();
@@ -172,10 +187,10 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
         private final ResultCallback<DataItemBuffer> onConnectedResultCallback = new ResultCallback<DataItemBuffer>() {
             @Override
             public void onResult(DataItemBuffer dataItems) {
+                Log.d(LOG_TAG, "Callback onConnectedResultCallback pulled" + dataItems.toString());
                 for (DataItem item : dataItems) {
                     getWeatherData(item);
                 }
-
                 dataItems.release();
             }
         };
@@ -186,13 +201,18 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                 DataMap dataMap = DataMapItem.fromDataItem(item).getDataMap();
                 if (dataMap.containsKey("weather_id")) {
                     int weatherId = dataMap.getInt("weather_id");
-                    mBackgroundPaint.setColor(SunshineWatchFace.this.getResources().getColor(R.color.background3));
+                    Log.d(LOG_TAG,"Received weather id");
+
                 }
                 if (dataMap.containsKey("low")) {
                     double low = dataMap.getDouble("low");
+                    Log.d(LOG_TAG,"Received low");
+
                 }
                 if (dataMap.containsKey("high")) {
                     double high = dataMap.getInt("high");
+                    Log.d(LOG_TAG,"Received high");
+
                 }
             }
         }
@@ -201,17 +221,20 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
         @Override
         public void onConnected(Bundle bundle) {
             Log.d(LOG_TAG, "connected GoogleAPI");
+            Wearable.DataApi.addListener(mGoogleApiClient, Engine.this);
             Wearable.DataApi.addListener(mGoogleApiClient, onDataChangedListener);
             Wearable.DataApi.getDataItems(mGoogleApiClient).setResultCallback(onConnectedResultCallback);
         }
 
         @Override
         public void onConnectionSuspended(int i) {
+            Log.d(LOG_TAG, "GoogleAPI connection suspended");
 
         }
 
         @Override
         public void onConnectionFailed(ConnectionResult connectionResult) {
+            Log.d(LOG_TAG, "GoogleAPI connection failed");
 
         }
 
