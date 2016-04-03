@@ -32,8 +32,21 @@ import android.os.Message;
 import android.support.wearable.watchface.CanvasWatchFaceService;
 import android.support.wearable.watchface.WatchFaceStyle;
 import android.text.format.Time;
+import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.WindowInsets;
+
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.wearable.DataApi;
+import com.google.android.gms.wearable.DataEvent;
+import com.google.android.gms.wearable.DataEventBuffer;
+import com.google.android.gms.wearable.DataItem;
+import com.google.android.gms.wearable.DataItemBuffer;
+import com.google.android.gms.wearable.DataMap;
+import com.google.android.gms.wearable.DataMapItem;
+import com.google.android.gms.wearable.Wearable;
 
 import java.lang.ref.WeakReference;
 import java.util.TimeZone;
@@ -83,7 +96,9 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
         }
     }
 
-    private class Engine extends CanvasWatchFaceService.Engine {
+    private class Engine extends CanvasWatchFaceService.Engine implements
+            GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
+        private final String LOG_TAG = Engine.class.getSimpleName();
         final Handler mUpdateTimeHandler = new EngineHandler(this);
         boolean mRegisteredTimeZoneReceiver = false;
         Paint mBackgroundPaint;
@@ -108,6 +123,8 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
          */
         boolean mLowBitAmbient;
 
+        private GoogleApiClient mGoogleApiClient;
+
         @Override
         public void onCreate(SurfaceHolder holder) {
             super.onCreate(holder);
@@ -128,11 +145,86 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
             mTextPaint = createTextPaint(resources.getColor(R.color.digital_text));
 
             mTime = new Time();
+
+            mGoogleApiClient = new GoogleApiClient.Builder(SunshineWatchFace.this)
+                    .addApi(Wearable.API)
+                    .addConnectionCallbacks(this)
+                    .addOnConnectionFailedListener(this)
+                    .build();
+        }
+
+        //onDataChangedListener will get notified every time there is a change in the data layer
+        private final DataApi.DataListener onDataChangedListener = new DataApi.DataListener() {
+            @Override
+            public void onDataChanged(DataEventBuffer dataEvents) {
+                for (DataEvent event : dataEvents) {
+                    if (event.getType() == DataEvent.TYPE_CHANGED) {
+                        DataItem item = event.getDataItem();
+                        getWeatherData(item);
+                    }
+                }
+
+                dataEvents.release();
+            }
+        };
+
+        //onConnectedResultCallback is only notified when the service is firstly connected
+        private final ResultCallback<DataItemBuffer> onConnectedResultCallback = new ResultCallback<DataItemBuffer>() {
+            @Override
+            public void onResult(DataItemBuffer dataItems) {
+                for (DataItem item : dataItems) {
+                    getWeatherData(item);
+                }
+
+                dataItems.release();
+            }
+        };
+
+        private void getWeatherData(DataItem item){
+            Log.d(LOG_TAG,"RECEIVING!!!!");
+            if ("/sunshine-weather".equals(item.getUri().getPath())){
+                DataMap dataMap = DataMapItem.fromDataItem(item).getDataMap();
+                if (dataMap.containsKey("weather_id")) {
+                    int weatherId = dataMap.getInt("weather_id");
+                    mBackgroundPaint.setColor(SunshineWatchFace.this.getResources().getColor(R.color.background3));
+                }
+                if (dataMap.containsKey("low")) {
+                    double low = dataMap.getDouble("low");
+                }
+                if (dataMap.containsKey("high")) {
+                    double high = dataMap.getInt("high");
+                }
+            }
+        }
+
+
+        @Override
+        public void onConnected(Bundle bundle) {
+            Log.d(LOG_TAG, "connected GoogleAPI");
+            Wearable.DataApi.addListener(mGoogleApiClient, onDataChangedListener);
+            Wearable.DataApi.getDataItems(mGoogleApiClient).setResultCallback(onConnectedResultCallback);
+        }
+
+        @Override
+        public void onConnectionSuspended(int i) {
+
+        }
+
+        @Override
+        public void onConnectionFailed(ConnectionResult connectionResult) {
+
+        }
+
+        private void releaseGoogleApiClient() {
+            if (mGoogleApiClient != null && mGoogleApiClient.isConnected()) {
+                mGoogleApiClient.disconnect();
+            }
         }
 
         @Override
         public void onDestroy() {
             mUpdateTimeHandler.removeMessages(MSG_UPDATE_TIME);
+            releaseGoogleApiClient();
             super.onDestroy();
         }
 
@@ -154,8 +246,11 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                 // Update time zone in case it changed while we weren't visible.
                 mTime.clear(TimeZone.getDefault().getID());
                 mTime.setToNow();
+
+                mGoogleApiClient.connect();
             } else {
                 unregisterReceiver();
+                releaseGoogleApiClient();
             }
 
             // Whether the timer should be running depends on whether we're visible (as well as
