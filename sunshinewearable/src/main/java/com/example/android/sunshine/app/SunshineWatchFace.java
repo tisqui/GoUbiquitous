@@ -21,6 +21,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Resources;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -50,6 +52,8 @@ import com.google.android.gms.wearable.Wearable;
 import com.squirrel.app.R;
 
 import java.lang.ref.WeakReference;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
@@ -104,10 +108,32 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
         private final String LOG_TAG = Engine.class.getSimpleName();
         final Handler mUpdateTimeHandler = new EngineHandler(this);
         boolean mRegisteredTimeZoneReceiver = false;
+
+        //colors of the watchface
+        private int mBackgroundInteractive;
+        private int mBackgroundAmbient;
+        private int mTextInteractive;
+        private int mSecondaryTextInteractive;
+        private int mLineInteractive;
+
         Paint mBackgroundPaint;
-        Paint mTextPaint;
-        boolean mAmbient;
+        Paint mTimePaint;
+        Paint mWeatherIconPaint;
+        Paint mDatePaint;
+        Paint mLinePaint;
+        Paint mTempPaint;
+
+        //weather icon
+        private Bitmap mWeatherIconBitmap;
+        private Bitmap mWeatherIconNoColorBitmap;
+
+        //low anf high temperature, shown on the screen
+        private String mHighTemp;
+        private String mLowTemp;
+
         Time mTime;
+        Date mDate;
+
         final BroadcastReceiver mTimeZoneReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -115,16 +141,22 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                 mTime.setToNow();
             }
         };
+
         int mTapCount;
 
         float mXOffset;
+        float mXCenter;
         float mYOffset;
+        float mYCenter;
 
         /**
          * Whether the display supports fewer bits for each color in ambient mode. When true, we
          * disable anti-aliasing in ambient mode.
          */
         boolean mLowBitAmbient;
+        boolean mAmbient; //if embient - show the dark color sheme
+        boolean mSquare;
+        boolean mRound;
 
         private GoogleApiClient mGoogleApiClient;
 
@@ -142,13 +174,35 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
             Resources resources = SunshineWatchFace.this.getResources();
             mYOffset = resources.getDimension(R.dimen.digital_y_offset);
 
-            mBackgroundPaint = new Paint();
-            mBackgroundPaint.setColor(resources.getColor(R.color.background));
+            //set the colors
+            mBackgroundInteractive = resources.getColor(R.color.background);
+            mBackgroundAmbient = resources.getColor(R.color.background_ambient);
+            mTextInteractive = resources.getColor(R.color.primary_text);
+            mSecondaryTextInteractive = resources.getColor(R.color.secondary_text);
+            mLineInteractive = resources.getColor(R.color.line_color);
 
-            mTextPaint = new Paint();
-            mTextPaint = createTextPaint(resources.getColor(R.color.digital_text));
+            mBackgroundPaint = new Paint();
+            mBackgroundPaint.setColor(mBackgroundInteractive);
+
+            mTimePaint = new Paint();
+            mTimePaint = createTextPaint(mTextInteractive);
+
+            mWeatherIconPaint = new Paint();
+
+            mDatePaint = new Paint();
+            mDatePaint.setColor(mSecondaryTextInteractive);
+
+            mLinePaint = new Paint();
+            mLinePaint.setColor(mLineInteractive);
+
+            mTempPaint = new Paint();
+            mTempPaint.setColor(mSecondaryTextInteractive);
 
             mTime = new Time();
+            mDate = new Date();
+
+            //setht the intial state to 0 temperature and clean weather
+            setWeatherInfo(0,0,800);
 
             mGoogleApiClient = new GoogleApiClient.Builder(SunshineWatchFace.this)
                     .addApi(Wearable.API)
@@ -156,6 +210,15 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                     .addOnConnectionFailedListener(this)
                     .build();
 
+        }
+
+        private void setWeatherInfo(int highTemp, int lowTemp, int weatherId){
+            mHighTemp = String.format("%3s",String.valueOf(highTemp)) + "° C";
+            mLowTemp = String.format("%3s",String.valueOf(lowTemp)) + "° C";
+
+            //set the icon
+            int iconId = Utilities.getIconResourceForWeatherCondition(weatherId);
+            mWeatherIconBitmap = BitmapFactory.decodeResource(getResources(), iconId);
         }
 
 //        @Override
@@ -204,16 +267,19 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                 DataMap dataMap = DataMapItem.fromDataItem(item).getDataMap();
                 if (dataMap.containsKey("weather_id")) {
                     int weatherId = dataMap.getInt("weather_id");
+                    int iconId = Utilities.getIconResourceForWeatherCondition(weatherId);
+                    mWeatherIconBitmap = BitmapFactory.decodeResource(getResources(), iconId);
                     Log.d(LOG_TAG,"Received weather id");
-
                 }
                 if (dataMap.containsKey("low")) {
-                    double low = dataMap.getDouble("low");
+//                    double low = dataMap.getDouble("low");
+                    mLowTemp = String.valueOf((int) dataMap.getDouble("low"));
                     Log.d(LOG_TAG,"Received low");
 
                 }
                 if (dataMap.containsKey("high")) {
-                    double high = dataMap.getDouble("high");
+//                    double high = dataMap.getDouble("high");
+                    mHighTemp = String.valueOf((int) dataMap.getDouble("high"));
                     Log.d(LOG_TAG,"Received high");
 
                 }
@@ -273,6 +339,10 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                 mTime.clear(TimeZone.getDefault().getID());
                 mTime.setToNow();
 
+                Calendar calendar = Calendar.getInstance();
+                calendar.setTimeZone(TimeZone.getDefault());
+                mDate = calendar.getTime();
+
                 mGoogleApiClient.connect();
             } else {
                 unregisterReceiver();
@@ -310,10 +380,17 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
             boolean isRound = insets.isRound();
             mXOffset = resources.getDimension(isRound
                     ? R.dimen.digital_x_offset_round : R.dimen.digital_x_offset);
-            float textSize = resources.getDimension(isRound
-                    ? R.dimen.digital_text_size_round : R.dimen.digital_text_size);
 
-            mTextPaint.setTextSize(textSize);
+            float timeSize = resources.getDimension(isRound
+                    ? R.dimen.digital_time_size_round : R.dimen.digital_time_size);
+            float dateSize = resources.getDimension(mRound
+                    ? R.dimen.digital_date_size_round : R.dimen.digital_date_size);
+            float tempSize = resources.getDimension(mRound
+                    ? R.dimen.digital_temp_size_round : R.dimen.digital_temp_size);
+
+            mTimePaint.setTextSize(timeSize);
+            mTempPaint.setTextSize(dateSize);
+            mDatePaint.setTextSize(tempSize);
         }
 
         @Override
@@ -334,7 +411,7 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
             if (mAmbient != inAmbientMode) {
                 mAmbient = inAmbientMode;
                 if (mLowBitAmbient) {
-                    mTextPaint.setAntiAlias(!inAmbientMode);
+                    mTimePaint.setAntiAlias(!inAmbientMode);
                 }
                 invalidate();
             }
@@ -360,9 +437,9 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                     break;
                 case TAP_TYPE_TAP:
                     // The user has completed the tap gesture.
-                    mTapCount++;
-                    mBackgroundPaint.setColor(resources.getColor(mTapCount % 2 == 0 ?
-                            R.color.background : R.color.background2));
+//                    mTapCount++;
+//                    mBackgroundPaint.setColor(resources.getColor(mTapCount % 2 == 0 ?
+//                            R.color.background : R.color.background2));
                     break;
             }
             invalidate();
@@ -379,11 +456,41 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
 
             // Draw H:MM in ambient and interactive mode
             mTime.setToNow();
-//            String text = mAmbient
-//                    ? String.format("%d:%02d", mTime.hour, mTime.minute)
-//                    : String.format("%d:%02d:%02d", mTime.hour, mTime.minute, mTime.second);
-            String text = String.format("%d:%02d", mTime.hour, mTime.minute);
-            canvas.drawText(text, mXOffset, mYOffset, mTextPaint);
+            long now = System.currentTimeMillis();
+            mDate.setTime(now);
+
+            String time = String.format("%d:%02d", mTime.hour, mTime.minute);
+            canvas.drawText(time, mXOffset, mYOffset, mTimePaint);
+
+            float y = mYOffset + getTextHeight(time, mTimePaint);
+
+            String date = Utilities.getFormattedDateString(mDate);
+            canvas.drawText(date, mXOffset, y, mDatePaint);
+
+            y+= getTextHeight(date, mDatePaint);
+            canvas.drawText(mHighTemp + " " + mLowTemp, mXOffset, y, mTempPaint);
+
+            y+= getTextHeight(mHighTemp, mTempPaint);
+            canvas.drawBitmap(mWeatherIconBitmap, mXOffset, y, mWeatherIconPaint);
+        }
+
+        /**
+         * solution found http://stackoverflow.com/questions/14277058/get-the-text-height-including-the-font-size-and-set-that-height
+         * @param text
+         * @param paint
+         * @return
+         */
+        private float getTextHeight(String text, Paint paint) {
+
+            Rect rect = new Rect();
+            paint.getTextBounds(text, 0, text.length(), rect);
+            return rect.height();
+        }
+
+        private float gettextWidth(String text, Paint paint){
+            Rect rect = new Rect();
+            paint.getTextBounds(text, 0, text.length(), rect);
+            return rect.width();
         }
 
         /**

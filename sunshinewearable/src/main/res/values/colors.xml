@@ -1,12 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Interactive mode -->
     <color name="background">#03A9F4</color>
     <color name="background2">#0288D1</color>
     <color name="background3">#000000</color>
-    <color name="detail_color">#B3E5FC</color>
+    <color name="line_color">#B3E5FC</color>
     <color name="digital_text">#ffffff</color>
-
-    <!-- Text -->
     <color name="primary_text">#FFFFFF</color>
     <color name="secondary_text">#B3E5FC</color>
+
+    <!-- Ambient mode -->
+    <color name="background_ambient">#000000</color>
+    <color name="text_ambient">#FFFFFF</color>
+
 </resources>
