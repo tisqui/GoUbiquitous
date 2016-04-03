@@ -38,6 +38,7 @@ import com.example.android.sunshine.app.data.WeatherContract;
 import com.example.android.sunshine.app.muzei.WeatherMuzeiSource;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.wearable.DataApi;
 import com.google.android.gms.wearable.PutDataMapRequest;
 import com.google.android.gms.wearable.PutDataRequest;
@@ -151,36 +152,28 @@ implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFail
             Bitmap icon = BitmapFactory.decodeResource(resources, iconId);
 
             //send data to the wearable
-            //TODO send the image
-            PutDataMapRequest putDataMapRequest = PutDataMapRequest.create(WEARABLE_URL);
+            //TODO send the image id?
+            final PutDataMapRequest putDataMapRequest = PutDataMapRequest.create(WEARABLE_URL);
             putDataMapRequest.getDataMap().putInt("weather_id", weatherId);
             putDataMapRequest.getDataMap().putDouble("high", high);
             putDataMapRequest.getDataMap().putDouble("low", low);
 
             PutDataRequest putDataRequest = putDataMapRequest.asPutDataRequest();
 
-            DataApi.DataItemResult result = Wearable.DataApi.putDataItem(mGoogleAPIClient, putDataRequest).await();
-            Log.d(LOG_TAG,"THREAD WEATHER DATA" );
-            if (result.getStatus().isSuccess()) {
-                Log.d(LOG_TAG, "DataMap: " + putDataMapRequest.getDataMap() + " sent successfully to data layer ");
-            } else {
-                // Log an error
-                Log.d(LOG_TAG, "ERROR: failed to send DataMap to data layer");
-            }
-
-//            Wearable.DataApi.putDataItem(mGoogleAPIClient, putDataRequest).setResultCallback(
-//                    new ResultCallback<DataApi.DataItemResult>() {
-//                        @Override
-//                        public void onResult(DataApi.DataItemResult dataItemResult) {
-//                            if (!dataItemResult.getStatus().isSuccess()) {
-//                                //fail
-//                            } else {
-//                                //success
-//                                Log.d(LOG_TAG, "Seems that success DataApi");
-//                            }
-//                        }
-//                    }
-//            );
+            Wearable.DataApi.putDataItem(mGoogleAPIClient, putDataRequest).setResultCallback(
+                    new ResultCallback<DataApi.DataItemResult>() {
+                        @Override
+                        public void onResult(DataApi.DataItemResult dataItemResult) {
+                            if (!dataItemResult.getStatus().isSuccess()) {
+                                //fail
+                                Log.d(LOG_TAG, "DataMap: sending error");
+                            } else {
+                                //success
+                                Log.d(LOG_TAG, "DataMap: " + putDataMapRequest.getDataMap() + " sent succesfully");
+                            }
+                        }
+                    }
+            );
         }
     }
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.squirrel.sunshinewearable;
+package com.example.android.sunshine.app;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -47,6 +47,7 @@ import com.google.android.gms.wearable.DataItemBuffer;
 import com.google.android.gms.wearable.DataMap;
 import com.google.android.gms.wearable.DataMapItem;
 import com.google.android.gms.wearable.Wearable;
+import com.squirrel.app.R;
 
 import java.lang.ref.WeakReference;
 import java.util.TimeZone;
@@ -97,7 +98,9 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
     }
 
     private class Engine extends CanvasWatchFaceService.Engine implements
-            GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, DataApi.DataListener {
+            GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener
+//            , DataApi.DataListener
+    {
         private final String LOG_TAG = Engine.class.getSimpleName();
         final Handler mUpdateTimeHandler = new EngineHandler(this);
         boolean mRegisteredTimeZoneReceiver = false;
@@ -155,17 +158,17 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
 
         }
 
-        @Override
-        public void onDataChanged(DataEventBuffer dataEventBuffer) {
-            Log.d(LOG_TAG, "FINALLY RECEIVED SMTH");
-            for (DataEvent event : dataEventBuffer) {
-                if (event.getType() == DataEvent.TYPE_CHANGED) {
-                    DataItem item = event.getDataItem();
-                    getWeatherData(item);
-                }
-            }
-            dataEventBuffer.release();
-        }
+//        @Override
+//        public void onDataChanged(DataEventBuffer dataEventBuffer) {
+//            Log.d(LOG_TAG, "FINALLY RECEIVED SMTH");
+//            for (DataEvent event : dataEventBuffer) {
+//                if (event.getType() == DataEvent.TYPE_CHANGED) {
+//                    DataItem item = event.getDataItem();
+//                    getWeatherData(item);
+//                }
+//            }
+//            dataEventBuffer.release();
+//        }
 
         //onDataChangedListener will get notified every time there is a change in the data layer
         private final DataApi.DataListener onDataChangedListener = new DataApi.DataListener() {
@@ -210,7 +213,7 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
 
                 }
                 if (dataMap.containsKey("high")) {
-                    double high = dataMap.getInt("high");
+                    double high = dataMap.getDouble("high");
                     Log.d(LOG_TAG,"Received high");
 
                 }
@@ -221,7 +224,7 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
         @Override
         public void onConnected(Bundle bundle) {
             Log.d(LOG_TAG, "connected GoogleAPI");
-            Wearable.DataApi.addListener(mGoogleApiClient, Engine.this);
+//            Wearable.DataApi.addListener(mGoogleApiClient, Engine.this);
             Wearable.DataApi.addListener(mGoogleApiClient, onDataChangedListener);
             Wearable.DataApi.getDataItems(mGoogleApiClient).setResultCallback(onConnectedResultCallback);
         }
