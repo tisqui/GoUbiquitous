@@ -47,6 +47,6 @@ public class Utilities {
 
     public static String getFormattedDateString(Date date){
         //format MON, JUL 14 2015
-        return new SimpleDateFormat("E, MMM d, yyyy", Locale.ENGLISH).format(date);
+        return new SimpleDateFormat("E, MMM d yyyy", Locale.ENGLISH).format(date);
     }
 }

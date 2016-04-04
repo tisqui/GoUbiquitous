@@ -12,5 +12,6 @@
     <!-- Ambient mode -->
     <color name="background_ambient">#000000</color>
     <color name="text_ambient">#FFFFFF</color>
+    <color name="line_ambient">#FFFFFF</color>
 
 </resources>
