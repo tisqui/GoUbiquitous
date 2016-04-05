@@ -163,8 +163,8 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
          * disable anti-aliasing in ambient mode.
          */
         boolean mLowBitAmbient;
+        boolean mBurnInProtection;
         boolean mAmbient; //if embient - show the dark color sheme
-        boolean mSquare;
         boolean mRound;
 
         private GoogleApiClient mGoogleApiClient;
@@ -277,12 +277,12 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                     Log.d(LOG_TAG,"Received weather id");
                 }
                 if (dataMap.containsKey("low")) {
-                    low = (int) dataMap.getDouble("low");
+                    low = (int) Math.round(dataMap.getDouble("low"));
                     Log.d(LOG_TAG,"Received low");
 
                 }
                 if (dataMap.containsKey("high")) {
-                    high = (int) dataMap.getDouble("high");
+                    high = (int) Math.round(dataMap.getDouble("high"));
                     Log.d(LOG_TAG,"Received high");
                 }
                 setWeatherInfo(high, low, weatherId);
@@ -408,7 +408,13 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
         @Override
         public void onPropertiesChanged(Bundle properties) {
             super.onPropertiesChanged(properties);
+            mBurnInProtection = properties.getBoolean(PROPERTY_BURN_IN_PROTECTION, false);
             mLowBitAmbient = properties.getBoolean(PROPERTY_LOW_BIT_AMBIENT, false);
+
+            //if BurnInProtection - should remove the bold text
+            mHighTempPaint.setTypeface(NORMAL_TYPEFACE);
+            mTimePaint.setTypeface(NORMAL_TYPEFACE);
+
         }
 
         @Override
